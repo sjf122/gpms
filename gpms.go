@@ -44,6 +44,12 @@ func handle(cmd string, projectname string) bool {
 			fmt.Println("Goodbye")
 			return true
 		}
+		// 列出当前的全部
+	case "list":
+		{
+			list()
+			return false
+		}
 	// 显示帮助
 	case "help":
 		{
@@ -225,18 +231,69 @@ func clean() bool {
 	return true
 }
 
+// list 列出来所有的项目
+func list() {
+	var project string
+	fmt.Println("----------")
+	// 获取当前目录
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// 读取文件夹内的文件
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	var iswork string
+	for _, f := range files {
+		iswork = ""
+		//fmt.Println(f.Name())
+		//fmt.Println(dir + "/" + f.Name())
+		ftype, err := os.Stat(dir + "/" + f.Name())
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		if ftype.IsDir() {
+			// 读取项目名称
+			//fmt.Println(dir + "/" + f.Name() + "/project.txt")
+			filename, fileerr := os.Open(dir + "/" + f.Name() + "/project.txt")
+			if fileerr != nil {
+				fmt.Println(fileerr)
+				return
+			}
+			projectname, _ := ioutil.ReadAll(filename)
+			filename.Close()
+			if f.Name() == "work" {
+				iswork = " [working]"
+			}
+			project = project + string(projectname) + iswork + "\r\n"
+		}
+	}
+	fmt.Print(project)
+	fmt.Println("----------")
+}
+
 // help 显示帮助文档
 func help() {
 	help := `
 ----------
 命令列表
+列出全部项目: list
 将xxx项目目录设置为work: use xxx项目名
 清空work目录: clean
 创建新项目: create xxx
 退出命令行: exit
 帮助: help
-PS：如果windows下出现 rename xxx xxx Access is denied. 现象，请关闭所有打开的文件夹/资源管理器窗口再进行操作
+PS：如果windows下出现 rename xxx xxx Access is denied. 现象，请重启windows资源管理器/关闭文件夹内打开的文件再进行操作
 ----------
-请输入命令:`
+`
 	fmt.Println(help)
+	fmt.Println("当前项目列表: ")
+	list()
+	fmt.Println(`请输入命令:`)
+
 }
