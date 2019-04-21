@@ -3,10 +3,15 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 )
 
 var cmd string
@@ -37,6 +42,13 @@ func main() {
 
 // handle 处理
 func handle(cmd string, projectname string) bool {
+	// 获取当前目录
+	newGoPATH, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	//
 	switch cmd {
 	// 退出
 	case "exit":
@@ -44,7 +56,7 @@ func handle(cmd string, projectname string) bool {
 			fmt.Println("Goodbye")
 			return true
 		}
-		// 列出当前的全部
+	// 列出当前的全部
 	case "list":
 		{
 			list()
@@ -78,6 +90,39 @@ func handle(cmd string, projectname string) bool {
 			}
 			return false
 		}
+	// GOPATH与GOBIN设置
+	case "thisdir", "newdir":
+		{
+			// 判断是否是新目标目录
+			if cmd == "newdir" {
+				if projectname != "" {
+					newGoPATH = projectname
+				} else {
+					fmt.Println("请输入新目录")
+					return false
+				}
+			}
+			//
+			switch runtime.GOOS {
+			case "linux":
+				{
+					linuxSet(newGoPATH)
+				}
+			case "windows":
+				{
+					windowsSet(newGoPATH)
+				}
+			case "darwin":
+				{
+					darwinSet(newGoPATH)
+				}
+			default:
+				{
+					fmt.Println("未知的操作系统")
+				}
+			}
+			return false
+		}
 	// 没有此命令
 	default:
 		{
@@ -85,6 +130,7 @@ func handle(cmd string, projectname string) bool {
 			return false
 		}
 	}
+	return false
 }
 
 // create 创建项目
@@ -262,7 +308,7 @@ func list() {
 			//fmt.Println(dir + "/" + f.Name() + "/project.txt")
 			filename, fileerr := os.Open(dir + "/" + f.Name() + "/project.txt")
 			if fileerr != nil {
-				fmt.Println(fileerr)
+				//fmt.Println(fileerr)
 				return
 			}
 			projectname, _ := ioutil.ReadAll(filename)
@@ -286,14 +332,79 @@ func help() {
 将xxx项目目录设置为work: use xxx项目名
 清空work目录: clean
 创建新项目: create xxx
+将当前目录的work文件夹设置为GOPATH: thisdir
+将xxx目录的work文件夹设置为GOPATH: newdir xxx
 退出命令行: exit
 帮助: help
 PS：如果windows下出现 rename xxx xxx Access is denied. 现象，请重启windows资源管理器/关闭文件夹内打开的文件再进行操作
-----------
-`
+----------`
 	fmt.Println(help)
+	fmt.Println("OS: " + runtime.GOOS + " >>> " + runtime.GOARCH)
+	fmt.Println("GOPATH: " + os.Getenv("GOPATH"))
+	fmt.Println("GOBIN: " + os.Getenv("GOBIN"))
+	fmt.Println("----------")
 	fmt.Println("当前项目列表: ")
 	list()
 	fmt.Println(`请输入命令:`)
+}
 
+// windows修改gopath
+func windowsSet(newGoPATH string) bool {
+	// 通过命令行调用setx命令实现 注意：必须加上.Output()才能操作成功
+	exec.Command("CMD", "/C", " setx GOPATH "+newGoPATH+"/work /m").Output()
+	exec.Command("CMD", "/C", " setx GOBIN "+newGoPATH+"/work/bin /m").Output()
+	//
+	exec.Command("CMD", "/C", " setx GOPATH "+newGoPATH+"/work").Output()
+	exec.Command("CMD", "/C", " setx GOBIN "+newGoPATH+"/work/bin").Output()
+	fmt.Println("设置成功, 请重启会话 reload session >>> " + newGoPATH)
+	return true
+}
+
+// linux修改gopath
+func linuxSet(newGoPATH string) bool {
+	return darwinSet(newGoPATH)
+}
+
+// mac修改gopath
+func darwinSet(newGoPATH string) bool {
+	// 编辑 ~/.bash_profile文件实现环境变量的修改
+	filename := os.Getenv("HOME") + "/.bash_profile"
+	// 读取文件
+	fi, err := os.Open(filename)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+		return false
+	}
+	defer fi.Close()
+	// 按行查找
+	br := bufio.NewReader(fi)
+	var out = ""
+	for {
+		a, _, c := br.ReadLine()
+		if c == io.EOF {
+			break
+		}
+		l := string(a)
+		if !strings.Contains(l, "export GOPATH") && !strings.Contains(l, "export GOBIN") && !strings.Contains(l, "export PATH=$PATH:$GOBIN") {
+			if out != "" {
+				out = out + "\n" + l
+			} else {
+				out = l
+			}
+		}
+	}
+	// 输出新文件
+	out = out + "\n" + "export GOPATH=" + newGoPATH + "/work"
+	out = out + "\n" + "export GOBIN=$GOPATH/bin"
+	out = out + "\n" + "export PATH=$PATH:$GOBIN"
+	//fmt.Println(out)
+	var ws = []byte(out)
+	err = ioutil.WriteFile(filename, ws, 0644)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+		return false
+	}
+	//
+	fmt.Println("设置成功, 请重启会话 reload session >>> " + newGoPATH)
+	return true
 }

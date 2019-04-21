@@ -15,6 +15,8 @@
   将xxx项目目录设置为work: use xxx项目名
   清空work目录: clean
   创建新项目: create xxx
+  将当前目录的work文件夹设置为GOPATH: thisdir
+  将xxx目录的work文件夹设置为GOPATH: newdir xxx
   退出命令行: exit
   帮助: help
 ```
