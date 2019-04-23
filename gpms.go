@@ -130,7 +130,6 @@ func handle(cmd string, projectname string) bool {
 			return false
 		}
 	}
-	return false
 }
 
 // create 创建项目
@@ -309,14 +308,15 @@ func list() {
 			filename, fileerr := os.Open(dir + "/" + f.Name() + "/project.txt")
 			if fileerr != nil {
 				//fmt.Println(fileerr)
-				return
+				//return
+			} else {
+				projectname, _ := ioutil.ReadAll(filename)
+				filename.Close()
+				if f.Name() == "work" {
+					iswork = " [working]"
+				}
+				project = project + string(projectname) + iswork + "\r\n"
 			}
-			projectname, _ := ioutil.ReadAll(filename)
-			filename.Close()
-			if f.Name() == "work" {
-				iswork = " [working]"
-			}
-			project = project + string(projectname) + iswork + "\r\n"
 		}
 	}
 	fmt.Print(project)
